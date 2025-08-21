@@ -14,8 +14,9 @@ DEFAULT_APP = {
     "gpu_indices": [],
     "workers_per_gpu": 1,
     "scan_interval_hours": 6,
-    "api_key": "",
-    "admin": {"username": "", "password": ""},
+    "paused": False,
+    "api_key": "",  # obsolète
+    "admin": {"username": "", "password_hash": ""},
 }
 
 DEFAULT_BITRATES = {
@@ -48,8 +49,12 @@ def load_app():
         merged.update(data or {})
         # Merge admin (objet imbriqué)
         if isinstance(merged.get("admin"), dict):
+            adm_in = merged.get("admin") or {}
             adm = DEFAULT_APP["admin"].copy()
-            adm.update(merged.get("admin") or {})
+            adm.update(adm_in)
+            # Migration: si ancien champ 'password' existe, on le laisse pour migration ultérieure (login/setup)
+            if "password" in adm_in and not adm.get("password_hash"):
+                adm["password_hash"] = ""  # sera rempli lors du setup ou du premier changement
             merged["admin"] = adm
         else:
             merged["admin"] = DEFAULT_APP["admin"].copy()

@@ -3,15 +3,16 @@
   "output_path": "/media-encoded",
   "cache_path": "/cache",
   "video_codec": "hevc",
-  "workers_per_gpu": 1,
   "gpu_indices": [
     0
   ],
+  "workers_per_gpu": 1,
   "scan_interval_hours": 6,
+  "paused": false,
+  "api_key": "",
   "admin": {
     "username": "admin",
-    "password": "admin"
+    "password_hash": "$2b$12$fa6Qh89sth3R9hais7.M3O96u42uusmIgN1jMvXFB/1J1sDhdRyam"
   },
-  "api_key": "",
   "port": 8000
 }

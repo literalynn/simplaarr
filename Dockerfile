@@ -2,14 +2,18 @@
 FROM node:18-slim AS webbuilder
 WORKDIR /web
 COPY frontend/package.json frontend/vite.config.js frontend/index.html ./
+COPY frontend/public ./public
 COPY frontend/src ./src
-RUN npm ci && npm run build
+RUN npm install --no-audit --no-fund && npm run build
 
 # ---------- Backend ----------
 FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 ENV SIMPLAARR_DB=/data/simplaarr.db SIMPLAARR_LOG=/logs/simplaarr.log SIMPLAARR_CONFIG=/config SIMPLAARR_STATIC=/app/static
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg pciutils && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg pciutils \
+    build-essential gcc python3-dev \
+  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY backend/requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt

@@ -16,6 +16,13 @@ export default function Settings(){
     setSaving(true)
     try { await postJSON('/api/settings/app', app) } finally { setSaving(false) }
   }
+  const [newUser, setNewUser] = useState('')
+  const [newPass, setNewPass] = useState('')
+  async function changeAccount(){
+    if(!newUser && !newPass) return
+    await postJSON('/api/auth/change', { username: newUser || undefined, password: newPass || undefined })
+    setNewPass(''); setNewUser(''); load()
+  }
   async function saveBit(){
     setSaving(true)
     try { await postJSON('/api/settings/bitrates', bit) } finally { setSaving(false) }
@@ -72,7 +79,7 @@ export default function Settings(){
         <div className="row" style={{marginTop:10}}>
           <div>
             <label>API key (optionnel)</label>
-            <input className="input" value={app.api_key||''} onChange={e=>setApp({...app, api_key: e.target.value})} />
+            <input className="input" value={app.api_key||''} onChange={e=>setApp({...app, api_key: e.target.value})} disabled />
           </div>
           <div>
             <label>Identifiant admin</label>
@@ -80,7 +87,7 @@ export default function Settings(){
           </div>
           <div>
             <label>Mot de passe admin</label>
-            <input className="input" value={app.admin?.password||''} onChange={e=>setApp({...app, admin:{...(app.admin||{}), password:e.target.value}})} />
+            <input className="input" value={'●●●●●●'} disabled />
           </div>
         </div>
         <div style={{marginTop:10}}>
@@ -126,6 +133,23 @@ export default function Settings(){
         </div>
         <div style={{marginTop:10}}>
           <button className="button" onClick={saveBit} disabled={saving}>{saving ? 'Sauvegarde…' : 'Sauvegarder les bitrates'}</button>
+        </div>
+      </div>
+
+      <div className="card">
+        <div style={{fontWeight:700}}>Compte administrateur</div>
+        <div className="row" style={{marginTop:10}}>
+          <div>
+            <label>Nouveau login (laisser vide pour ne pas changer)</label>
+            <input className="input" value={newUser} onChange={e=>setNewUser(e.target.value)} />
+          </div>
+          <div>
+            <label>Nouveau mot de passe (laisser vide pour ne pas changer)</label>
+            <input type="password" className="input" value={newPass} onChange={e=>setNewPass(e.target.value)} />
+          </div>
+        </div>
+        <div style={{marginTop:10}}>
+          <button className="button" onClick={changeAccount} disabled={saving}>Mettre à jour le compte</button>
         </div>
       </div>
     </>

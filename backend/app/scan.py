@@ -44,6 +44,13 @@ def worker_loop(stop_event):
     threads: list[threading.Thread] = []
 
     while not stop_event.is_set():
+        try:
+            # Respecter pause
+            if load_app().get("paused"):
+                time.sleep(1)
+                continue
+        except Exception:
+            pass
         # Réservation atomique d'un lot
         batch_size = workers if gpus else 1
         batch = claim_next_pending(limit=batch_size)

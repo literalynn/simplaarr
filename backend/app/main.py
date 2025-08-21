@@ -3,6 +3,7 @@ import os, threading
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 from .db import init_db
 from .api import router as api_router
 from .scan import worker_loop, scheduler_loop
@@ -15,13 +16,17 @@ app.add_middleware(
     allow_origins=["*"],
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
+# Session cookie (auth)
+secret = os.environ.get("SIMPLAARR_SECRET", "dev-secret-change-me")
+app.add_middleware(SessionMiddleware, secret_key=secret, same_site="lax")
+
 static_dir = os.environ.get("SIMPLAARR_STATIC", "/app/static")
+app.include_router(api_router)
 if os.path.isdir(static_dir):
     app.mount("/", StaticFiles(directory=static_dir, html=True), name="static")
-
-app.include_router(api_router)
 
 stop_event = threading.Event()
 threads = []

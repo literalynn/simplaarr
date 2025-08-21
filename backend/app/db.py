@@ -112,3 +112,46 @@ def list_recent(limit=100):
         return [{
             "src": r[0], "dst": r[1], "status": r[2], "error": r[3], "updated_at": r[4]
         } for r in rows]
+
+def list_jobs(limit=200, status: str | None = None):
+    with db() as conn:
+        cur = conn.cursor()
+        if status:
+            cur.execute(
+                "SELECT src_path, dst_path, status, error, updated_at FROM jobs WHERE status=? ORDER BY updated_at DESC LIMIT ?",
+                (status, limit)
+            )
+        else:
+            cur.execute(
+                "SELECT src_path, dst_path, status, error, updated_at FROM jobs ORDER BY updated_at DESC LIMIT ?",
+                (limit,)
+            )
+        rows = cur.fetchall()
+        return [{
+            "src": r[0], "dst": r[1], "status": r[2], "error": r[3], "updated_at": r[4]
+        } for r in rows]
+
+def retry_failed(srcs: list[str] | None = None, all_failed: bool = False):
+    with db() as conn:
+        cur = conn.cursor()
+        if all_failed:
+            cur.execute("UPDATE jobs SET status='pending', error=NULL WHERE status='failed'")
+            return cur.rowcount
+        if srcs:
+            qmarks = ",".join(["?"] * len(srcs))
+            cur.execute(f"UPDATE jobs SET status='pending', error=NULL WHERE status='failed' AND src_path IN ({qmarks})", tuple(srcs))
+            return cur.rowcount
+        return 0
+
+def purge_failed():
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM jobs WHERE status='failed'")
+        return cur.rowcount
+
+def delete_pending(srcs: list[str]):
+    with db() as conn:
+        cur = conn.cursor()
+        qmarks = ",".join(["?"] * len(srcs))
+        cur.execute(f"DELETE FROM jobs WHERE status='pending' AND src_path IN ({qmarks})", tuple(srcs))
+        return cur.rowcount

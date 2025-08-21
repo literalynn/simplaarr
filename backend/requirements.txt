@@ -9,3 +9,5 @@ orjson==3.10.6
 psutil==5.9.8
 pynvml==11.5.0
 watchfiles==0.21.0
+itsdangerous==2.2.0
+bcrypt==4.2.0
