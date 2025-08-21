@@ -5,24 +5,83 @@ CONFIG_DIR = os.environ.get("SIMPLAARR_CONFIG", "/config")
 APP_JSON = os.path.join(CONFIG_DIR, "app.json")
 BIT_JSON = os.path.join(CONFIG_DIR, "bitrates.json")
 
+# Valeurs par défaut créées automatiquement si les fichiers manquent
+DEFAULT_APP = {
+    "library_path": "/media",
+    "output_path": "/media-encoded",
+    "cache_path": "/cache",
+    "video_codec": "hevc",  # hevc | h264 | av1
+    "gpu_indices": [],
+    "workers_per_gpu": 1,
+    "scan_interval_hours": 6,
+    "api_key": "",
+    "admin": {"username": "", "password": ""},
+}
+
+DEFAULT_BITRATES = {
+    "defaults": [
+        {"width": 3840, "hdr": True,  "bitrate_kbps": 18000},
+        {"width": 3840, "hdr": False, "bitrate_kbps": 16000},
+        {"width": 1920, "hdr": True,  "bitrate_kbps": 10000},
+        {"width": 1920, "hdr": False, "bitrate_kbps": 8000},
+        {"width": 1280, "hdr": False, "bitrate_kbps": 4500},
+    ],
+    "overrides": []
+}
+
 _lock = threading.Lock()
 
 def load_app():
+    os.makedirs(CONFIG_DIR, exist_ok=True)
     with _lock:
-        with open(APP_JSON, "r") as f:
-            return json.load(f)
+        if not os.path.exists(APP_JSON):
+            with open(APP_JSON, "w") as f:
+                json.dump(DEFAULT_APP, f, indent=2)
+            return DEFAULT_APP.copy()
+        try:
+            with open(APP_JSON, "r") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        # Merge avec defaults (priorité au fichier)
+        merged = DEFAULT_APP.copy()
+        merged.update(data or {})
+        # Merge admin (objet imbriqué)
+        if isinstance(merged.get("admin"), dict):
+            adm = DEFAULT_APP["admin"].copy()
+            adm.update(merged.get("admin") or {})
+            merged["admin"] = adm
+        else:
+            merged["admin"] = DEFAULT_APP["admin"].copy()
+        return merged
 
 def save_app(cfg):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
     with _lock:
         with open(APP_JSON, "w") as f:
             json.dump(cfg, f, indent=2)
 
 def load_bitrates():
+    os.makedirs(CONFIG_DIR, exist_ok=True)
     with _lock:
-        with open(BIT_JSON, "r") as f:
-            return json.load(f)
+        if not os.path.exists(BIT_JSON):
+            with open(BIT_JSON, "w") as f:
+                json.dump(DEFAULT_BITRATES, f, indent=2)
+            return DEFAULT_BITRATES.copy()
+        try:
+            with open(BIT_JSON, "r") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        # Merge simple avec defaults
+        merged = {
+            "defaults": data.get("defaults") if isinstance(data.get("defaults"), list) and data.get("defaults") else DEFAULT_BITRATES["defaults"],
+            "overrides": data.get("overrides") if isinstance(data.get("overrides"), list) else [],
+        }
+        return merged
 
 def save_bitrates(data):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
     with _lock:
         with open(BIT_JSON, "w") as f:
             json.dump(data, f, indent=2)

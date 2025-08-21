@@ -9,6 +9,12 @@ os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 def init_db():
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.cursor()
+        # Optimisations SQLite: WAL et synchronous NORMAL
+        try:
+            cur.execute("PRAGMA journal_mode=WAL;")
+            cur.execute("PRAGMA synchronous=NORMAL;")
+        except Exception:
+            pass
         cur.execute("""
 CREATE TABLE IF NOT EXISTS jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,6 +33,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 """)
         cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_jobs_updated ON jobs(updated_at DESC);")
         conn.commit()
 
 @contextmanager
@@ -69,6 +76,21 @@ def fetch_next_pending(limit=1):
         cur = conn.cursor()
         cur.execute("SELECT src_path, dst_path FROM jobs WHERE status='pending' LIMIT ?", (limit,))
         return cur.fetchall()
+
+def claim_next_pending(limit=1):
+    """Réservation atomique d'un lot de jobs en 'processing'.
+    SQLite n'a pas RETURNING sur toutes versions; on fait en deux temps sous transaction.
+    """
+    claimed = []
+    with db() as conn:
+        cur = conn.cursor()
+        cur.execute("BEGIN IMMEDIATE")
+        cur.execute("SELECT src_path, dst_path FROM jobs WHERE status='pending' LIMIT ?", (limit,))
+        rows = cur.fetchall()
+        for src, dst in rows:
+            cur.execute("UPDATE jobs SET status='processing' WHERE src_path=? AND status='pending'", (src,))
+            claimed.append((src, dst))
+    return claimed
 
 def get_stats():
     with db() as conn:

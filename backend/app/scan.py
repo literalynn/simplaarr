@@ -1,7 +1,7 @@
 
 import os, time, threading
 from .settings import load_app
-from .db import upsert_job, get_stats, fetch_next_pending, mark_status
+from .db import upsert_job, get_stats, fetch_next_pending, mark_status, claim_next_pending
 from .logs import write as log
 from .encode import process_file
 
@@ -33,8 +33,20 @@ def worker_loop(stop_event):
     gpu_cycle = [None] if not gpus else gpus[:]
     gpu_index = 0
 
+    # Exécute N workers en parallèle (par GPU ou global selon config)
+    def run_one(src, dst, assigned_gpu):
+        ok, msg = process_file(src, dst, assigned_gpu=assigned_gpu)
+        if ok:
+            mark_status(src, "done", assigned_gpu=assigned_gpu)
+        else:
+            mark_status(src, "failed", error=msg, assigned_gpu=assigned_gpu)
+
+    threads: list[threading.Thread] = []
+
     while not stop_event.is_set():
-        batch = fetch_next_pending(limit=workers if gpus else 1)
+        # Réservation atomique d'un lot
+        batch_size = workers if gpus else 1
+        batch = claim_next_pending(limit=batch_size)
         if not batch:
             time.sleep(2)
             continue
@@ -43,12 +55,13 @@ def worker_loop(stop_event):
             if gpus:
                 assigned_gpu = gpu_cycle[gpu_index % len(gpu_cycle)]
                 gpu_index += 1
-            mark_status(src, "processing", assigned_gpu=assigned_gpu)
-            ok, msg = process_file(src, dst, assigned_gpu=assigned_gpu)
-            if ok:
-                mark_status(src, "done", assigned_gpu=assigned_gpu)
-            else:
-                mark_status(src, "failed", error=msg, assigned_gpu=assigned_gpu)
+            t = threading.Thread(target=run_one, args=(src, dst, assigned_gpu), daemon=True)
+            t.start()
+            threads.append(t)
+        # Limiter le nombre de threads vivants
+        threads = [t for t in threads if t.is_alive()]
+        while len(threads) >= max(1, len(gpu_cycle)) * workers and any(t.is_alive() for t in threads):
+            time.sleep(0.5)
 
 def scheduler_loop(stop_event):
     while not stop_event.is_set():

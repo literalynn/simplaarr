@@ -20,9 +20,18 @@ def ffprobe_info(path):
         return {}
 
 def detect_props(info):
-    vstreams = [s for s in info.get("streams", []) if s.get("codec_type")=="video"]
+    streams = info.get("streams", [])
+    vstreams = [s for s in streams if s.get("codec_type")=="video"]
+    astreams = [s for s in streams if s.get("codec_type")=="audio"]
     if not vstreams:
-        return {}
+        # Même si aucune vidéo détectée, on renvoie au moins des infos audio
+        channels = 0
+        for a in astreams:
+            try:
+                channels = max(channels, int(a.get("channels") or 0))
+            except Exception:
+                pass
+        return {"audio_channels": channels or 0}
     v = vstreams[0]
     width = v.get("width")
     height = v.get("height")
@@ -39,7 +48,14 @@ def detect_props(info):
     hdr = color_primaries in ("bt2020","bt2020nc") or "smpte2084" in transfer or "2020" in (matrix or "")
     text = json.dumps(info).lower()
     dovi = ("dolby vision" in text) or ("dovi" in text) or ("dv_profile" in text) or ("com.apple.proapps.dovi" in text)
+    channels = 0
+    for a in astreams:
+        try:
+            channels = max(channels, int(a.get("channels") or 0))
+        except Exception:
+            pass
     return {
         "width": width, "height": height, "bitrate_kbps": br_kbps,
-        "codec": codec, "pix_fmt": pix, "hdr": hdr, "dovi": dovi
+        "codec": codec, "pix_fmt": pix, "hdr": hdr, "dovi": dovi,
+        "audio_channels": channels or 0
     }

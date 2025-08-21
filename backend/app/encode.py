@@ -30,28 +30,46 @@ def needs_reencode(src_info, cfg, target_codec, target_bitrate):
 def build_ffmpeg_cmd(src, dst, cfg, props, target_bitrate_kbps, assigned_gpu, target_codec):
     gpu_list = cfg.get("gpu_indices") or []
     use_gpu = len(gpu_list) > 0
+
+    # Choix encodeur + profil + profondeur (8-bit SDR, 10-bit HDR)
+    is_hdr = bool(props.get("hdr"))
     if target_codec == "hevc":
         venc = "hevc_nvenc" if use_gpu else "libx265"
-        pixfmt = "p010le" if props.get("hdr") else "yuv420p10le"
-        vprofile = "main10"
-        extra = "-rc vbr"
+        pixfmt = "p010le" if is_hdr else "yuv420p"  # SDR 8-bit
+        vprofile = "main10" if is_hdr else "main"
+        nvenc_rc = "-rc vbr" if use_gpu else ""
     elif target_codec == "h264":
         venc = "h264_nvenc" if use_gpu else "libx264"
         pixfmt = "yuv420p"
         vprofile = "high"
-        extra = "-rc vbr"
+        nvenc_rc = "-rc vbr" if use_gpu else ""
     else:
         venc = "av1_nvenc" if use_gpu else "libaom-av1"
-        pixfmt = "p010le" if props.get("hdr") else "yuv420p10le"
+        pixfmt = "p010le" if is_hdr else "yuv420p10le"  # AV1 10-bit recommandé
         vprofile = "main"
-        extra = ""
+        nvenc_rc = "-rc vbr" if use_gpu and "nvenc" in venc else ""
+
+    # HW accel lecture + sélection GPU
     hwaccel = f"-hwaccel cuda -hwaccel_output_format cuda -extra_hw_frames 8" if use_gpu else ""
     gpu_index = assigned_gpu if use_gpu else None
     devsel = f"-init_hw_device cuda=cu:{gpu_index} -filter_hw_device cu" if use_gpu and gpu_index is not None else ""
 
-    aac_bitrate = 640
-    tmp = dst + ".tmp.mkv"
-    cmd = f'ffmpeg -y {hwaccel} {devsel} -i "{src}" -map 0:v:0 -map 0:a? -map 0:s? '           f'-c:v {venc} -pix_fmt {pixfmt} -profile:v {vprofile} -b:v {target_bitrate_kbps}k {extra} '           f'-c:a aac -b:a {aac_bitrate}k -ac 6 -c:s copy -max_muxing_queue_size 1024 "{tmp}"'
+    # Audio adaptatif: stéréo → 2ch, sinon 6ch
+    channels = 6 if int((props.get("audio_channels") or 0)) > 2 else 2
+    aac_bitrate = 384 if channels == 2 else 640
+
+    # Utiliser cache pour le fichier temporaire
+    cache_dir = (cfg.get("cache_path") or os.path.dirname(dst))
+    os.makedirs(cache_dir, exist_ok=True)
+    tmp = os.path.join(cache_dir, os.path.basename(dst) + ".tmp.mkv")
+
+    cmd = (
+        f'ffmpeg -y {hwaccel} {devsel} -i "{src}" '
+        f'-map 0:v:0 -map 0:a? -map 0:s? '
+        f'-c:v {venc} -pix_fmt {pixfmt} -profile:v {vprofile} -b:v {target_bitrate_kbps}k {nvenc_rc} '
+        f'-c:a aac -b:a {aac_bitrate}k -ac {channels} -c:s copy '
+        f'-max_muxing_queue_size 1024 "{tmp}"'
+    )
     return cmd, tmp
 
 def health_check(path):
@@ -92,6 +110,7 @@ def process_file(src_path, dst_path, assigned_gpu=None):
         return False, "health_check_failed"
 
     try:
+        os.makedirs(os.path.dirname(dst_path), exist_ok=True)
         os.replace(tmp, dst_path)
     except Exception:
         shutil.move(tmp, dst_path)

@@ -7,11 +7,6 @@ services:
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: ["gpu"]
     volumes:
       - ./config:/config
       - ./logs:/logs
@@ -20,3 +15,4 @@ services:
       - ./media-encoded:/media-encoded
       - ./data:/data
     restart: unless-stopped
+    gpus: all
