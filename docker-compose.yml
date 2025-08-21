@@ -1,0 +1,22 @@
+services:
+  simplaarr:
+    build: .
+    container_name: simplaarr
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: ["gpu"]
+    volumes:
+      - ./config:/config
+      - ./logs:/logs
+      - ./cache:/cache
+      - ./media:/media:ro
+      - ./media-encoded:/media-encoded
+      - ./data:/data
+    restart: unless-stopped

@@ -1,0 +1,17 @@
+{
+  "library_path": "/media",
+  "output_path": "/media-encoded",
+  "cache_path": "/cache",
+  "video_codec": "hevc",
+  "workers_per_gpu": 1,
+  "gpu_indices": [
+    0
+  ],
+  "scan_interval_hours": 6,
+  "admin": {
+    "username": "admin",
+    "password": "admin"
+  },
+  "api_key": "",
+  "port": 8000
+}

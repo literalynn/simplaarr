@@ -1,0 +1,37 @@
+{
+  "defaults": [
+    {
+      "width": 3840,
+      "hdr": true,
+      "bitrate_kbps": 18000
+    },
+    {
+      "width": 3840,
+      "hdr": false,
+      "bitrate_kbps": 16000
+    },
+    {
+      "width": 1920,
+      "hdr": false,
+      "bitrate_kbps": 8000
+    },
+    {
+      "width": 1280,
+      "hdr": false,
+      "bitrate_kbps": 4000
+    },
+    {
+      "width": 720,
+      "hdr": false,
+      "bitrate_kbps": 2000
+    }
+  ],
+  "overrides": [
+    {
+      "directory_pattern": "Anime",
+      "width": 1920,
+      "hdr": false,
+      "bitrate_kbps": 5000
+    }
+  ]
+}
